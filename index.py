@@ -24,20 +24,23 @@ class Taxations:
 
     # calculate taxation based on the parameters
     def calculateTaxForProduct(self, product):
-        totalTaxation = 0
-        if(not self.__isExempted(product["name"])):
-            totalTaxation += (((product["price"] *
-                              product["quantity"]) * self.basicSalesTax)/100)
-            if product["isImported"]:
-                totalTaxation += ((product["price"] *
-                                  product["quantity"]) * self.importSalesTax)/100
+        if product:
+            totalTaxation = 0
+            if(not self.__isExempted(product["name"])):
+                totalTaxation += (((product["price"] *
+                                    product["quantity"]) * self.basicSalesTax)/100)
+                if product["isImported"]:
+                    totalTaxation += ((product["price"] *
+                                       product["quantity"]) * self.importSalesTax)/100
+            else:
+                if product["isImported"]:
+                    totalTaxation += ((product["price"] * product["quantity"])
+                                      * self.importSalesTax)/100
+            finalCost = round(
+                (product["price"] + totalTaxation) * product["quantity"], 2)
+            return {"salesTax": totalTaxation, "finalCost": finalCost}
         else:
-            if product["isImported"]:
-                totalTaxation += ((product["price"] * product["quantity"])
-                                  * self.importSalesTax)/100
-        finalCost = round(
-            (product["price"] + totalTaxation) * product["quantity"], 2)
-        return {"salesTax": totalTaxation, "finalCost": finalCost}
+            return None
 
 
 class Shop:
@@ -59,11 +62,16 @@ class Shop:
         productsDetail = []
 
         def decodeProductDetails(product):
-            price = inputSentence.lower().split(
-                f"{product['name']} at ")[1].split(" ")[0]
+            try:
+                price = inputSentence.lower().split(
+                    f"{product['name']} at ")[1].split(" ")[0]
+                quantity = re.findall(
+                    "[0-9]+", inputSentence.lower().partition(f"{product['name']}")[0])[-1]
+            except:
+                print(
+                    "Cannot find price or quantity for the product, problem in input string.")
+                return None
 
-            quantity = re.findall(
-                "[0-9]+", inputSentence.lower().partition(f"{product['name']}")[0])[-1]
             return {
                 "name": product["name"],
                 "price": float(price),
@@ -83,13 +91,13 @@ class Shop:
         else:
             name = " ".join(re.findall(
                 "[a-z]+", inputSentence.lower().split(" at ")[0]))
-            print(name)
             productsDetail.append({
                 "name": name
             })
         productsDetail = list(map(decodeProductDetails, productsDetail))
-        for i in range(0, inputSentence.lower().count("imported")):
-            productsDetail[i].update({"isImported": True})
+        if productsDetail:
+            for i in range(0, inputSentence.lower().count("imported")):
+                productsDetail[i].update({"isImported": True})
 
         return productsDetail
 
@@ -102,32 +110,36 @@ class Shop:
             print(lineItem)
 
     def printReceipt(self):
-        taxation = Taxations()
-        total = 0
-        totalSalesTax = 0
-        receiptStrings = []
-        for listItem in self.receiptItems:
-            for item in listItem:
-                taxDetails = taxation.calculateTaxForProduct(item)
-                total += taxDetails["finalCost"]
-                totalSalesTax += taxDetails["salesTax"]
-        for cartItem in self.cart:
-            tempStr = cartItem
+        if self.receiptItems[0] != None and self.receiptItems[0][0] != None:
+            taxation = Taxations()
+            total = 0
+            totalSalesTax = 0
+            receiptStrings = []
             for listItem in self.receiptItems:
                 for item in listItem:
                     taxDetails = taxation.calculateTaxForProduct(item)
-                    tempStr = tempStr.replace(
-                        f"{item['price']}", f"{taxDetails['finalCost']}")
-            receiptStrings.append(tempStr.strip())
-        print("\n\n")
-        for receiptString in receiptStrings:
-            print(receiptString)
+                    total += taxDetails["finalCost"]
+                    totalSalesTax += taxDetails["salesTax"]
+            for cartItem in self.cart:
+                tempStr = cartItem
+                for listItem in self.receiptItems:
+                    for item in listItem:
+                        taxDetails = taxation.calculateTaxForProduct(item)
+                        tempStr = tempStr.replace(
+                            f"{item['price']}", f"{taxDetails['finalCost']}")
+                receiptStrings.append(tempStr.strip())
+            print("\n\n")
+            for receiptString in receiptStrings:
+                print(receiptString)
 
-        print(f"Total Sales Tax : {round(totalSalesTax,2)}")
-        print(f"Total : {total}")
-        print("____________________________________________________")
-        print("Your final receipt, Thanks for shopping with US !!")
-        print("\n")
+            print(f"Total Sales Tax : {round(totalSalesTax,2)}")
+            print(f"Total : {total}")
+            print("____________________________________________________")
+            print("Your final receipt, Thanks for shopping with US !!")
+            print("\n")
+        else:
+            print(
+                "There has been an error , probably input strings format aren't correct!")
 
 
 def __init__():
